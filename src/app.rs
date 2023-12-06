@@ -1,6 +1,8 @@
 use egui::*;
+use std::cell::RefCell;
+
 pub struct Sumu {
-    lines: Vec<Vec<Pos2>>,
+    lines: RefCell<Vec<Vec<Pos2>>>,
     stroke: Stroke,
 }
 
@@ -28,11 +30,11 @@ impl Sumu {
         );
         let from_screen = to_screen.inverse();
 
-        if self.lines.is_empty() {
-            self.lines.push(vec![]);
+        if self.lines.borrow().is_empty() {
+            self.lines.borrow_mut().push(vec![]);
         }
 
-        let current_line = self.lines.last_mut().unwrap();
+        let current_line = self.lines.get_mut().last_mut().unwrap();
 
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let canvas_pos = from_screen * pointer_pos;
@@ -41,20 +43,28 @@ impl Sumu {
                 response.mark_changed();
             }
         } else if !current_line.is_empty() {
-            self.lines.push(vec![]);
+            self.lines.borrow_mut().push(vec![]);
             response.mark_changed();
         }
 
-        let shapes = self
-            .lines
-            .iter()
-            .filter(|line| line.len() >= 2)
-            .map(|line| {
-                let points: Vec<Pos2> = line.iter().map(|p| to_screen * *p).collect();
-                egui::Shape::line(points, self.stroke)
-            });
+        // let mut shapes = self
+        //     .lines
+        //     .iter()
+        //     .filter(|line| line.len() >= 2)
+        //     .map(|line| {
+        //         let points: Vec<Pos2> = line.iter().map(|p| to_screen * *p).collect();
+        //         let shape = egui::Shape::line(points, self.stroke);
+        //         shape
+        //     });
 
-        painter.extend(shapes);
+        for (idx, line) in self.lines.borrow().iter().enumerate() {
+            if line.len() >= 2 {
+                let points: Vec<egui::Pos2> = line.iter().map(|p| to_screen * *p).collect();
+                let shape = egui::Shape::line(points, self.stroke);
+                painter.add(shape);
+            }
+        }
+        // painter.extend(shapes);
         response
     }
 }
@@ -71,6 +81,18 @@ impl eframe::App for Sumu {
                 });
                 ui.add_space(16.0);
                 egui::widgets::global_dark_light_mode_buttons(ui);
+
+                if ui
+                    .add_enabled(self.lines.get_mut().len() > 1, egui::Button::new("⮪"))
+                    .clicked()
+                {
+                    let last_line = self.lines.get_mut().len() - 2;
+                    self.lines.get_mut().get_mut(last_line).unwrap().clear();
+                    self.lines.get_mut().pop();
+                }
+                if ui.add_enabled(false, egui::Button::new("⮫")).clicked() {
+                    unreachable!();
+                }
             });
         });
 
