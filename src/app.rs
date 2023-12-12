@@ -2,11 +2,25 @@ use egui::*;
 use std::cell::RefCell;
 
 pub struct Sumu {
-    lines: RefCell<Vec<Vec<Pos2>>>,
+    redo_history: RefCell<Vec<Action>>,
+    actions: RefCell<Vec<Action>>,
+}
+
+pub struct Action {
+    lines: RefCell<Vec<Pos2>>,
     stroke: Stroke,
 }
 
 impl Default for Sumu {
+    fn default() -> Self {
+        Self {
+            redo_history: Default::default(),
+            actions: Default::default(),
+        }
+    }
+}
+
+impl Default for Action {
     fn default() -> Self {
         Self {
             lines: Default::default(),
@@ -30,41 +44,60 @@ impl Sumu {
         );
         let from_screen = to_screen.inverse();
 
-        if self.lines.borrow().is_empty() {
-            self.lines.borrow_mut().push(vec![]);
+        if self.actions.borrow().is_empty() {
+            let action = Action::default();
+            self.actions.borrow_mut().push(action);
         }
 
-        let current_line = self.lines.get_mut().last_mut().unwrap();
+        let mut current_action = self.actions.borrow_mut();
 
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let canvas_pos = from_screen * pointer_pos;
-            if current_line.last() != Some(&canvas_pos) {
-                current_line.push(canvas_pos);
+            if current_action.last().unwrap().lines.borrow().last() != Some(&canvas_pos) {
+                current_action
+                    .last()
+                    .unwrap()
+                    .lines
+                    .borrow_mut()
+                    .push(canvas_pos);
                 response.mark_changed();
             }
-        } else if !current_line.is_empty() {
-            self.lines.borrow_mut().push(vec![]);
+        } else if !current_action.last().unwrap().lines.borrow().is_empty() {
+            current_action.push(Default::default());
             response.mark_changed();
         }
 
-        // let mut shapes = self
-        //     .lines
-        //     .iter()
-        //     .filter(|line| line.len() >= 2)
-        //     .map(|line| {
-        //         let points: Vec<Pos2> = line.iter().map(|p| to_screen * *p).collect();
-        //         let shape = egui::Shape::line(points, self.stroke);
-        //         shape
-        //     });
+        let shapes = current_action
+            .iter()
+            .filter(|action| action.lines.borrow().len() >= 2)
+            .map(|action| {
+                let points: Vec<Pos2> = action
+                    .lines
+                    .borrow()
+                    .iter()
+                    .map(|p| to_screen * *p)
+                    .collect();
+                let shape = egui::Shape::line(points, action.stroke);
+                shape
+            });
 
-        for (idx, line) in self.lines.borrow().iter().enumerate() {
-            if line.len() >= 2 {
-                let points: Vec<egui::Pos2> = line.iter().map(|p| to_screen * *p).collect();
-                let shape = egui::Shape::line(points, self.stroke);
-                painter.add(shape);
-            }
-        }
-        // painter.extend(shapes);
+        // for (idx, action) in current_action.iter().enumerate() {
+        //     // println!("{:?}", idx);
+        //     if action.lines.borrow().len() >= 2 && action.current == true {
+        //         // println!("{:?}", action.current);
+        //         let points: Vec<egui::Pos2> = action
+        //             .lines
+        //             .borrow()
+        //             .iter()
+        //             .map(|p| to_screen * *p)
+        //             .collect();
+        //         // println!("{:?}", points);
+
+        //         let shape = egui::Shape::line(points, action.stroke);
+        //         painter.add(shape);
+        //     }
+        // }
+        painter.extend(shapes);
         response
     }
 }
@@ -82,20 +115,28 @@ impl eframe::App for Sumu {
                 ui.add_space(16.0);
                 egui::widgets::global_dark_light_mode_buttons(ui);
 
+                let last_line = self.actions.borrow().len();
+
                 if ui
-                    .add_enabled(self.lines.get_mut().len() > 1, egui::Button::new("⮪"))
+                    .add_enabled(last_line > 1, egui::Button::new("⮪"))
                     .clicked()
                 {
-                    let last_line = self.lines.get_mut().len() - 2;
-                    self.lines.get_mut().get_mut(last_line).unwrap().clear();
-                    self.lines.get_mut().pop();
+                    let mut last_action = self.actions.borrow_mut().pop();
+                    let lines = &self.actions.get_mut().get_mut(last_line - 2).unwrap().lines;
+                    last_action.as_mut().unwrap().lines = lines.clone();
+                    self.redo_history.get_mut().push(last_action.unwrap());
+                    lines.borrow_mut().clear();
                 }
-                if ui.add_enabled(false, egui::Button::new("⮫")).clicked() {
-                    unreachable!();
+                if ui
+                    .add_enabled(self.redo_history.borrow().len() > 0, egui::Button::new("⮫"))
+                    .clicked()
+                {
+                    let red = self.redo_history.get_mut().pop();
+                    self.actions.get_mut().push(red.unwrap());
                 }
             });
         });
-
+        // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
