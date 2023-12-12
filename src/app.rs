@@ -112,6 +112,12 @@ impl eframe::App for Sumu {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
+                ui.menu_button("Edit", |ui| {
+                    if ui.button("Clear").clicked() {
+                        self.actions.get_mut().clear();
+                    }
+                });
+
                 ui.add_space(16.0);
                 egui::widgets::global_dark_light_mode_buttons(ui);
 
