@@ -30,7 +30,7 @@ impl Default for Action {
 }
 
 impl Sumu {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Default::default()
     }
 
@@ -80,23 +80,6 @@ impl Sumu {
                 let shape = egui::Shape::line(points, action.stroke);
                 shape
             });
-
-        // for (idx, action) in current_action.iter().enumerate() {
-        //     // println!("{:?}", idx);
-        //     if action.lines.borrow().len() >= 2 && action.current == true {
-        //         // println!("{:?}", action.current);
-        //         let points: Vec<egui::Pos2> = action
-        //             .lines
-        //             .borrow()
-        //             .iter()
-        //             .map(|p| to_screen * *p)
-        //             .collect();
-        //         // println!("{:?}", points);
-
-        //         let shape = egui::Shape::line(points, action.stroke);
-        //         painter.add(shape);
-        //     }
-        // }
         painter.extend(shapes);
         response
     }
@@ -115,6 +98,7 @@ impl eframe::App for Sumu {
                 ui.menu_button("Edit", |ui| {
                     if ui.button("Clear").clicked() {
                         self.actions.get_mut().clear();
+                        self.redo_history.get_mut().clear();
                     }
                 });
 
@@ -137,8 +121,8 @@ impl eframe::App for Sumu {
                     .add_enabled(self.redo_history.borrow().len() > 0, egui::Button::new("⮫"))
                     .clicked()
                 {
-                    let red = self.redo_history.get_mut().pop();
-                    self.actions.get_mut().push(red.unwrap());
+                    let redo = self.redo_history.get_mut().pop();
+                    self.actions.get_mut().push(redo.unwrap());
                 }
             });
         });
@@ -147,7 +131,10 @@ impl eframe::App for Sumu {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                self.ui_content(ui);
+                let canvas = self.ui_content(ui);
+                if canvas.dragged() || canvas.clicked() {
+                    self.redo_history.get_mut().clear();
+                }
             });
         });
     }
