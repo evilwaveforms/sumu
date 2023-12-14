@@ -34,54 +34,36 @@ impl Sumu {
         Default::default()
     }
 
-    pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
-        let (mut response, painter) =
-            ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag());
+    pub fn ui_content(&mut self, ui: &mut Ui) -> (egui::Response, egui::Painter) {
+        ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag())
+    }
 
-        let to_screen = emath::RectTransform::from_to(
-            Rect::from_min_size(Pos2::ZERO, response.rect.square_proportions()),
-            response.rect,
-        );
-        let from_screen = to_screen.inverse();
-
-        if self.actions.borrow().is_empty() {
-            let action = Action::default();
-            self.actions.borrow_mut().push(action);
-        }
-
+    pub fn paint(&mut self, mut canvas: Response, from_screen: emath::RectTransform) {
         let mut current_action = self.actions.borrow_mut();
-
-        if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let canvas_pos = from_screen * pointer_pos;
-            if current_action.last().unwrap().lines.borrow().last() != Some(&canvas_pos) {
-                current_action
-                    .last()
-                    .unwrap()
-                    .lines
-                    .borrow_mut()
-                    .push(canvas_pos);
-                response.mark_changed();
+        if canvas.clicked() || canvas.dragged() {
+            if current_action.is_empty() {
+                let action = Action::default();
+                current_action.push(action);
             }
-        } else if !current_action.last().unwrap().lines.borrow().is_empty() {
-            current_action.push(Default::default());
-            response.mark_changed();
+            self.redo_history.get_mut().clear();
         }
-
-        let shapes = current_action
-            .iter()
-            .filter(|action| action.lines.borrow().len() >= 2)
-            .map(|action| {
-                let points: Vec<Pos2> = action
-                    .lines
-                    .borrow()
-                    .iter()
-                    .map(|p| to_screen * *p)
-                    .collect();
-                let shape = egui::Shape::line(points, action.stroke);
-                shape
-            });
-        painter.extend(shapes);
-        response
+        if !current_action.is_empty() {
+            if let Some(pointer_pos) = canvas.interact_pointer_pos() {
+                let canvas_pos = from_screen * pointer_pos;
+                if current_action.last().unwrap().lines.borrow().last() != Some(&canvas_pos) {
+                    current_action
+                        .last()
+                        .unwrap()
+                        .lines
+                        .borrow_mut()
+                        .push(canvas_pos);
+                    canvas.mark_changed();
+                }
+            } else if !current_action.last().unwrap().lines.borrow().is_empty() {
+                current_action.push(Default::default());
+                canvas.mark_changed();
+            }
+        }
     }
 }
 
@@ -111,16 +93,22 @@ impl eframe::App for Sumu {
                     .add_enabled(last_line > 1, egui::Button::new("⮪"))
                     .clicked()
                 {
-                    let mut last_action = self.actions.borrow_mut().pop();
+                    // let len = self.actions.get_mut().len();
+                    // println!("{len}");
+                    let mut last_action = self.actions.get_mut().pop();
                     let lines = &self.actions.get_mut().get_mut(last_line - 2).unwrap().lines;
                     last_action.as_mut().unwrap().lines = lines.clone();
                     self.redo_history.get_mut().push(last_action.unwrap());
                     lines.borrow_mut().clear();
+                    lines.borrow_mut().pop();
+                    // let len = self.actions.get_mut().len();
+                    // println!("{len}");
                 }
                 if ui
                     .add_enabled(self.redo_history.borrow().len() > 0, egui::Button::new("⮫"))
                     .clicked()
                 {
+                    // TODO: Fix redo history. Seems to increase in size too much after redo.
                     let redo = self.redo_history.get_mut().pop();
                     self.actions.get_mut().push(redo.unwrap());
                 }
@@ -131,9 +119,34 @@ impl eframe::App for Sumu {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                let canvas = self.ui_content(ui);
-                if canvas.dragged() || canvas.clicked() {
-                    self.redo_history.get_mut().clear();
+                let (canvas, painter) = self.ui_content(ui);
+                let to_screen = emath::RectTransform::from_to(
+                    Rect::from_min_size(Pos2::ZERO, canvas.rect.square_proportions()),
+                    canvas.rect,
+                );
+                let from_screen = to_screen.inverse();
+
+                // TODO: Fix redo history, this is not good,
+                // as having shortcuts would make this broken.
+                if canvas.hovered() {
+                    self.paint(canvas, from_screen);
+                }
+                let current_action = self.actions.borrow_mut();
+                if !current_action.is_empty() {
+                    let shapes = current_action
+                        .iter()
+                        .filter(|action| action.lines.borrow().len() >= 2)
+                        .map(|action| {
+                            let points: Vec<Pos2> = action
+                                .lines
+                                .borrow()
+                                .iter()
+                                .map(|p| to_screen * *p)
+                                .collect();
+                            let shape = egui::Shape::line(points, action.stroke);
+                            shape
+                        });
+                    painter.extend(shapes);
                 }
             });
         });
