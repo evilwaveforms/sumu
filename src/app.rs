@@ -4,6 +4,7 @@ use std::cell::RefCell;
 pub struct Sumu {
     redo_history: RefCell<Vec<Action>>,
     actions: RefCell<Vec<Action>>,
+    latest: bool,
 }
 
 pub struct Action {
@@ -16,6 +17,7 @@ impl Default for Sumu {
         Self {
             redo_history: Default::default(),
             actions: Default::default(),
+            latest: true,
         }
     }
 }
@@ -38,7 +40,7 @@ impl Sumu {
         ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag())
     }
 
-    pub fn paint(&mut self, mut canvas: Response, from_screen: emath::RectTransform) {
+    pub fn paint(&mut self, canvas: &mut Response, from_screen: emath::RectTransform) {
         let mut current_action = self.actions.borrow_mut();
         if canvas.clicked() || canvas.dragged() {
             if current_action.is_empty() {
@@ -46,6 +48,7 @@ impl Sumu {
                 current_action.push(action);
             }
             self.redo_history.get_mut().clear();
+            self.latest = true;
         }
         if !current_action.is_empty() {
             if let Some(pointer_pos) = canvas.interact_pointer_pos() {
@@ -60,7 +63,7 @@ impl Sumu {
                     canvas.mark_changed();
                 }
             } else if !current_action.last().unwrap().lines.borrow().is_empty() {
-                current_action.push(Default::default());
+                current_action.push(Action::default());
                 canvas.mark_changed();
             }
         }
@@ -90,25 +93,20 @@ impl eframe::App for Sumu {
                 let last_line = self.actions.borrow().len();
 
                 if ui
-                    .add_enabled(last_line > 1, egui::Button::new("⮪"))
+                    .add_enabled(last_line > 0, egui::Button::new("⮪"))
                     .clicked()
                 {
-                    // let len = self.actions.get_mut().len();
-                    // println!("{len}");
-                    let mut last_action = self.actions.get_mut().pop();
-                    let lines = &self.actions.get_mut().get_mut(last_line - 2).unwrap().lines;
-                    last_action.as_mut().unwrap().lines = lines.clone();
+                    if self.redo_history.get_mut().len() == 0 && self.latest == true {
+                        self.actions.get_mut().pop();
+                        self.latest = false;
+                    }
+                    let last_action = self.actions.get_mut().pop();
                     self.redo_history.get_mut().push(last_action.unwrap());
-                    lines.borrow_mut().clear();
-                    lines.borrow_mut().pop();
-                    // let len = self.actions.get_mut().len();
-                    // println!("{len}");
                 }
                 if ui
                     .add_enabled(self.redo_history.borrow().len() > 0, egui::Button::new("⮫"))
                     .clicked()
                 {
-                    // TODO: Fix redo history. Seems to increase in size too much after redo.
                     let redo = self.redo_history.get_mut().pop();
                     self.actions.get_mut().push(redo.unwrap());
                 }
@@ -119,17 +117,16 @@ impl eframe::App for Sumu {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                let (canvas, painter) = self.ui_content(ui);
+                let (mut canvas, painter) = self.ui_content(ui);
                 let to_screen = emath::RectTransform::from_to(
                     Rect::from_min_size(Pos2::ZERO, canvas.rect.square_proportions()),
                     canvas.rect,
                 );
                 let from_screen = to_screen.inverse();
 
-                // TODO: Fix redo history, this is not good,
-                // as having shortcuts would make this broken.
+                // TODO: Change this for shortcut usage?
                 if canvas.hovered() {
-                    self.paint(canvas, from_screen);
+                    self.paint(&mut canvas, from_screen);
                 }
                 let current_action = self.actions.borrow_mut();
                 if !current_action.is_empty() {
