@@ -5,11 +5,19 @@ pub struct Sumu {
     redo_history: RefCell<Vec<Action>>,
     actions: RefCell<Vec<Action>>,
     latest: bool,
+    curr_action: Action,
 }
 
-pub struct Action {
+#[derive(Clone, Debug)]
+pub struct Paint {
     lines: RefCell<Vec<Pos2>>,
     stroke: Stroke,
+}
+
+#[derive(Clone, Debug)]
+pub enum Action {
+    Paint(Paint),
+    Erase(Paint),
 }
 
 impl Default for Sumu {
@@ -18,11 +26,18 @@ impl Default for Sumu {
             redo_history: Default::default(),
             actions: Default::default(),
             latest: true,
+            curr_action: Action::default(),
         }
     }
 }
 
 impl Default for Action {
+    fn default() -> Self {
+        Action::Paint(Paint::default())
+    }
+}
+
+impl Default for Paint {
     fn default() -> Self {
         Self {
             lines: Default::default(),
@@ -40,30 +55,33 @@ impl Sumu {
         ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag())
     }
 
-    pub fn paint(&mut self, canvas: &mut Response, from_screen: emath::RectTransform) {
+    pub fn paint(
+        &mut self,
+        canvas: &mut Response,
+        from_screen: emath::RectTransform,
+        action: Action,
+    ) {
         let mut current_action = self.actions.borrow_mut();
         if canvas.clicked() || canvas.dragged() {
             if current_action.is_empty() {
-                let action = Action::default();
-                current_action.push(action);
+                current_action.push(action.clone());
             }
             self.redo_history.get_mut().clear();
             self.latest = true;
         }
         if !current_action.is_empty() {
+            let curr_action = match current_action.last().unwrap() {
+                Action::Paint(paint) => paint,
+                Action::Erase(erase) => erase,
+            };
             if let Some(pointer_pos) = canvas.interact_pointer_pos() {
                 let canvas_pos = from_screen * pointer_pos;
-                if current_action.last().unwrap().lines.borrow().last() != Some(&canvas_pos) {
-                    current_action
-                        .last()
-                        .unwrap()
-                        .lines
-                        .borrow_mut()
-                        .push(canvas_pos);
+                if curr_action.lines.borrow().last() != Some(&canvas_pos) {
+                    curr_action.lines.borrow_mut().push(canvas_pos);
                     canvas.mark_changed();
                 }
-            } else if !current_action.last().unwrap().lines.borrow().is_empty() {
-                current_action.push(Action::default());
+            } else if !curr_action.lines.borrow().is_empty() {
+                current_action.push(action.clone());
                 canvas.mark_changed();
             }
         }
@@ -110,6 +128,12 @@ impl eframe::App for Sumu {
                     let redo = self.redo_history.get_mut().pop();
                     self.actions.get_mut().push(redo.unwrap());
                 }
+                if ui.add(egui::Button::new("■")).clicked() {
+                    self.curr_action = Action::Erase(Paint {
+                        lines: Default::default(),
+                        stroke: Stroke::new(5.0, ui.visuals().extreme_bg_color),
+                    });
+                }
             });
         });
         // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
@@ -126,22 +150,35 @@ impl eframe::App for Sumu {
 
                 // TODO: Change this for shortcut usage?
                 if canvas.hovered() {
-                    self.paint(&mut canvas, from_screen);
+                    self.paint(&mut canvas, from_screen, self.curr_action.clone());
                 }
                 let current_action = self.actions.borrow_mut();
                 if !current_action.is_empty() {
                     let shapes = current_action
                         .iter()
-                        .filter(|action| action.lines.borrow().len() >= 2)
-                        .map(|action| {
-                            let points: Vec<Pos2> = action
-                                .lines
-                                .borrow()
-                                .iter()
-                                .map(|p| to_screen * *p)
-                                .collect();
-                            let shape = egui::Shape::line(points, action.stroke);
-                            shape
+                        .filter(|action| match action {
+                            Action::Paint(paint) | Action::Erase(paint) => {
+                                paint.lines.borrow().len() >= 2
+                            }
+                        })
+                        .map(|action| match action {
+                            Action::Paint(paint) | Action::Erase(paint) => {
+                                let points: Vec<Pos2> = paint
+                                    .lines
+                                    .borrow()
+                                    .iter()
+                                    .map(|p| to_screen * *p)
+                                    .collect();
+
+                                match action {
+                                    Action::Erase(_) => {
+                                        let bg_color = ui.visuals().extreme_bg_color;
+                                        let stroke = Stroke::new(10.0, bg_color);
+                                        egui::Shape::line(points, stroke)
+                                    }
+                                    _ => egui::Shape::line(points, paint.stroke),
+                                }
+                            }
                         });
                     painter.extend(shapes);
                 }
