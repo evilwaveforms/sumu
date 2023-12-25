@@ -8,13 +8,13 @@ pub struct Sumu {
     curr_action: Action,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Paint {
     lines: RefCell<Vec<Pos2>>,
     stroke: Stroke,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Action {
     Paint(Paint),
     Erase(Paint),
@@ -41,7 +41,8 @@ impl Default for Paint {
     fn default() -> Self {
         Self {
             lines: Default::default(),
-            stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)),
+            // stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)),
+            stroke: Stroke::new(1.0, Color32::RED),
         }
     }
 }
@@ -128,12 +129,9 @@ impl eframe::App for Sumu {
                     let redo = self.redo_history.get_mut().pop();
                     self.actions.get_mut().push(redo.unwrap());
                 }
-                if ui.add(egui::Button::new("■")).clicked() {
-                    self.curr_action = Action::Erase(Paint {
-                        lines: Default::default(),
-                        stroke: Stroke::new(5.0, ui.visuals().extreme_bg_color),
-                    });
-                }
+
+                ui.selectable_value(&mut self.curr_action, Action::Paint(Default::default()), "✏");
+                ui.selectable_value(&mut self.curr_action, Action::Erase(Default::default()), "⬜");
             });
         });
         // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
