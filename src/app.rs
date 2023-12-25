@@ -130,8 +130,17 @@ impl eframe::App for Sumu {
                     self.actions.get_mut().push(redo.unwrap());
                 }
 
-                ui.selectable_value(&mut self.curr_action, Action::Paint(Default::default()), "✏");
-                ui.selectable_value(&mut self.curr_action, Action::Erase(Default::default()), "⬜");
+                let brush = match self.curr_action.clone() {
+                    Action::Paint(paint) => paint,
+                    Action::Erase(erase) => erase,
+                };
+                ui.selectable_value(&mut self.curr_action, Action::Erase(brush.to_owned()), "⬜");
+                ui.selectable_value(&mut self.curr_action, Action::Paint(brush.to_owned()), "✏");
+
+                match &mut self.curr_action {
+                    Action::Paint(paint) => egui::stroke_ui(ui, &mut paint.stroke, "Stroke"),
+                    _ => (),
+                };
             });
         });
         // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
