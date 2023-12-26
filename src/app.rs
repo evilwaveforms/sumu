@@ -106,11 +106,9 @@ impl eframe::App for Sumu {
                     }
                 });
 
-                ui.add_space(16.0);
-                egui::widgets::global_dark_light_mode_buttons(ui);
+                ui.add_space(8.0);
 
                 let last_line = self.actions.borrow().len();
-
                 if ui
                     .add_enabled(last_line > 0, egui::Button::new("⮪"))
                     .clicked()
@@ -130,17 +128,22 @@ impl eframe::App for Sumu {
                     self.actions.get_mut().push(redo.unwrap());
                 }
 
+                ui.add_space(8.0);
+
                 let brush = match self.curr_action.clone() {
                     Action::Paint(paint) => paint,
                     Action::Erase(erase) => erase,
                 };
                 ui.selectable_value(&mut self.curr_action, Action::Erase(brush.to_owned()), "⬜");
                 ui.selectable_value(&mut self.curr_action, Action::Paint(brush.to_owned()), "✏");
-
                 match &mut self.curr_action {
                     Action::Paint(paint) => egui::stroke_ui(ui, &mut paint.stroke, "Stroke"),
                     _ => (),
                 };
+
+                ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                    egui::widgets::global_dark_light_mode_buttons(ui)
+                });
             });
         });
         // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
