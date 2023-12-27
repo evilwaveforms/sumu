@@ -93,8 +93,10 @@ impl eframe::App for Sumu {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.visuals_mut().selection.bg_fill = Color32::from_rgb(136, 8, 8);
+            ui.visuals_mut().selection.stroke = Stroke::new(1.0, Color32::BLACK);
+
             egui::menu::bar(ui, |ui| {
-                ui.visuals_mut().selection.bg_fill = Color32::from_rgb(136, 8, 8);
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
