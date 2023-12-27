@@ -106,6 +106,7 @@ impl eframe::App for Sumu {
                     if ui.button("Clear").clicked() {
                         self.actions.get_mut().clear();
                         self.redo_history.get_mut().clear();
+                        ui.close_menu();
                     }
                 });
 
