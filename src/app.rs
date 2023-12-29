@@ -87,6 +87,24 @@ impl Sumu {
             }
         }
     }
+
+    pub fn undo(&mut self) {
+        if self.actions.borrow().len() > 0 {
+            if self.redo_history.get_mut().len() == 0 && self.latest == true {
+                self.actions.get_mut().pop();
+                self.latest = false;
+            }
+            let last_action = self.actions.get_mut().pop();
+            self.redo_history.get_mut().push(last_action.unwrap());
+        }
+    }
+
+    pub fn redo(&mut self) {
+        if self.redo_history.borrow().len() > 0 {
+            let redo = self.redo_history.get_mut().pop();
+            self.actions.get_mut().push(redo.unwrap());
+        }
+    }
 }
 
 impl eframe::App for Sumu {
@@ -103,6 +121,14 @@ impl eframe::App for Sumu {
                     }
                 });
                 ui.menu_button("Edit", |ui| {
+                    // if ui.button("Undo").clicked() {
+                    //     self.undo();
+                    //     ui.close_menu();
+                    // }
+                    // if ui.button("Redo").clicked() {
+                    //     self.undo();
+                    //     ui.close_menu();
+                    // }
                     if ui.button("Clear").clicked() {
                         self.actions.get_mut().clear();
                         self.redo_history.get_mut().clear();
@@ -112,24 +138,17 @@ impl eframe::App for Sumu {
 
                 ui.add_space(8.0);
 
-                let last_line = self.actions.borrow().len();
                 if ui
-                    .add_enabled(last_line > 0, egui::Button::new("⮪"))
+                    .add_enabled(self.actions.borrow().len() > 0, egui::Button::new("⮪"))
                     .clicked()
                 {
-                    if self.redo_history.get_mut().len() == 0 && self.latest == true {
-                        self.actions.get_mut().pop();
-                        self.latest = false;
-                    }
-                    let last_action = self.actions.get_mut().pop();
-                    self.redo_history.get_mut().push(last_action.unwrap());
+                    self.undo();
                 }
                 if ui
                     .add_enabled(self.redo_history.borrow().len() > 0, egui::Button::new("⮫"))
                     .clicked()
                 {
-                    let redo = self.redo_history.get_mut().pop();
-                    self.actions.get_mut().push(redo.unwrap());
+                    self.redo();
                 }
 
                 ui.add_space(8.0);
@@ -150,7 +169,6 @@ impl eframe::App for Sumu {
                 });
             });
         });
-        // println!("{:?}", ctx.input(|i| i.pointer.to_owned()));
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
@@ -162,10 +180,19 @@ impl eframe::App for Sumu {
                 );
                 let from_screen = to_screen.inverse();
 
-                // TODO: Change this for shortcut usage?
+                // if ctx.input(|input| input.modifiers.matches(Modifiers::CTRL)) {
+                //     if ctx.input(|input| input.key_pressed(Key::Z)) {
+                //         self.undo();
+                //     }
+                //     if ctx.input(|input| input.key_pressed(Key::R)) {
+                //         self.redo();
+                //     }
+                // }
+
                 if canvas.hovered() {
                     self.paint(&mut canvas, from_screen, self.curr_action.clone());
                 }
+
                 let current_action = self.actions.borrow_mut();
                 if !current_action.is_empty() {
                     let shapes = current_action
