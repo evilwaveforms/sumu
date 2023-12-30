@@ -7,6 +7,7 @@ pub struct Sumu {
     latest: bool,
     curr_action_type: ActionType,
     curr_stroke: Stroke,
+    img_path: Option<String>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -30,6 +31,7 @@ impl Default for Sumu {
             latest: true,
             curr_action_type: ActionType::Paint,
             curr_stroke: Stroke::new(1.0, Color32::from_rgb(136, 8, 8)),
+            img_path: None,
         }
     }
 }
@@ -115,6 +117,11 @@ impl eframe::App for Sumu {
 
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Open file").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().pick_file() {
+                            self.img_path = Some(path.display().to_string());
+                        }
+                    }
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
@@ -123,6 +130,7 @@ impl eframe::App for Sumu {
                     if ui.button("Clear").clicked() {
                         self.actions.get_mut().clear();
                         self.redo_history.get_mut().clear();
+                        self.img_path = None;
                         ui.close_menu();
                     }
                 });
@@ -162,6 +170,10 @@ impl eframe::App for Sumu {
                     canvas.rect,
                 );
                 let from_screen = to_screen.inverse();
+
+                if let Some(img_path) = &self.img_path {
+                    egui::Image::new("file://".to_owned() + img_path).paint_at(ui, canvas.rect);
+                }
 
                 if ctx.input(|input| input.modifiers.matches(Modifiers::CTRL)) {
                     if ctx.input(|input| input.key_pressed(Key::Z)) {

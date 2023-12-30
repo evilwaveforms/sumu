@@ -12,6 +12,9 @@ fn main() {
     let _ = eframe::run_native(
         "sumu",
         native_options,
-        Box::new(|cc| Box::new(Sumu::new(cc))),
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            Box::new(Sumu::new(cc))
+        }),
     );
 }
