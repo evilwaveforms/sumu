@@ -121,14 +121,6 @@ impl eframe::App for Sumu {
                     }
                 });
                 ui.menu_button("Edit", |ui| {
-                    // if ui.button("Undo").clicked() {
-                    //     self.undo();
-                    //     ui.close_menu();
-                    // }
-                    // if ui.button("Redo").clicked() {
-                    //     self.undo();
-                    //     ui.close_menu();
-                    // }
                     if ui.button("Clear").clicked() {
                         self.actions.get_mut().clear();
                         self.redo_history.get_mut().clear();
@@ -180,16 +172,14 @@ impl eframe::App for Sumu {
                 );
                 let from_screen = to_screen.inverse();
 
-                // if ctx.input(|input| input.modifiers.matches(Modifiers::CTRL)) {
-                //     if ctx.input(|input| input.key_pressed(Key::Z)) {
-                //         self.undo();
-                //     }
-                //     if ctx.input(|input| input.key_pressed(Key::R)) {
-                //         self.redo();
-                //     }
-                // }
-
-                if canvas.hovered() {
+                if ctx.input(|input| input.modifiers.matches(Modifiers::CTRL)) {
+                    if ctx.input(|input| input.key_pressed(Key::Z)) {
+                        self.undo();
+                    }
+                    if ctx.input(|input| input.key_pressed(Key::R)) {
+                        self.redo();
+                    }
+                } else if canvas.hovered() {
                     self.paint(&mut canvas, from_screen, self.curr_action.clone());
                 }
 
