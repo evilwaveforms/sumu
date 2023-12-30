@@ -7,7 +7,7 @@ pub struct Sumu {
     latest: bool,
     curr_action_type: ActionType,
     curr_stroke: Stroke,
-    img_path: Option<String>
+    img_path: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -50,10 +50,6 @@ impl Default for Action {
 impl Sumu {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Default::default()
-    }
-
-    pub fn ui_content(&mut self, ui: &mut Ui) -> (egui::Response, egui::Painter) {
-        ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag())
     }
 
     pub fn paint(&mut self, canvas: &mut Response, from_screen: emath::RectTransform) {
@@ -161,10 +157,10 @@ impl eframe::App for Sumu {
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
             // ui.heading("𝔰𝔲𝔪𝔲");
             egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                let (mut canvas, painter) = self.ui_content(ui);
+                let (mut canvas, painter) =
+                    ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag());
                 let to_screen = emath::RectTransform::from_to(
                     Rect::from_min_size(Pos2::ZERO, canvas.rect.square_proportions()),
                     canvas.rect,
