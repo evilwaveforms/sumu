@@ -1,8 +1,6 @@
-use std::env;
 use sumu::Sumu;
 
 fn main() {
-    env::set_var("RUST_BACKTRACE", "1");
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])

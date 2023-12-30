@@ -17,7 +17,7 @@ pub struct Action {
     action_type: ActionType,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ActionType {
     Paint,
     Erase,
@@ -56,9 +56,11 @@ impl Sumu {
         let mut current_action = self.actions.borrow_mut();
         if canvas.clicked() || canvas.dragged() {
             if current_action.is_empty() {
-                let mut new_action = Action::default();
-                new_action.action_type = self.curr_action_type.clone();
-                new_action.stroke = self.curr_stroke.clone();
+                let new_action = Action {
+                    action_type: self.curr_action_type,
+                    stroke: self.curr_stroke,
+                    ..Default::default()
+                };
                 current_action.push(new_action);
             }
             self.redo_history.get_mut().clear();
@@ -76,10 +78,12 @@ impl Sumu {
                     canvas.mark_changed();
                 }
             } else if !curr_action.lines.borrow().is_empty() {
-                let mut new_ac = Action::default();
-                new_ac.action_type = self.curr_action_type.clone();
-                new_ac.stroke = self.curr_stroke.clone();
-                current_action.push(new_ac);
+                let new_action = Action {
+                    action_type: self.curr_action_type,
+                    stroke: self.curr_stroke,
+                    ..Default::default()
+                };
+                current_action.push(new_action);
                 canvas.mark_changed();
             }
         }
@@ -102,6 +106,34 @@ impl Sumu {
             self.actions.get_mut().push(redo.unwrap());
         }
     }
+
+    pub fn handle_save(&self, ctx: &Context, canvas: Response) {
+        let screenshot = ctx.input(|i| {
+            for event in &i.raw.events {
+                if let egui::Event::Screenshot { image, .. } = event {
+                    return Some(image.clone());
+                }
+            }
+            None
+        });
+
+        if let (Some(screenshot), area) = (screenshot, canvas.rect) {
+            if let Some(mut path) = rfd::FileDialog::new().save_file() {
+                path.set_extension("png");
+                let ppp = ctx.pixels_per_point();
+                let img = screenshot.region(&area, Some(ppp));
+                image::save_buffer(
+                    &path,
+                    img.as_raw(),
+                    img.width() as u32,
+                    img.height() as u32,
+                    image::ColorType::Rgba8,
+                )
+                .unwrap();
+                eprintln!("Image saved to {path:?}.");
+            }
+        }
+    }
 }
 
 impl eframe::App for Sumu {
@@ -113,10 +145,15 @@ impl eframe::App for Sumu {
 
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("Open file").clicked() {
+                    if ui.button("Open").clicked() {
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             self.img_path = Some(path.display().to_string());
                         }
+                        ui.close_menu();
+                    }
+                    if ui.button("Save").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
+                        ui.close_menu();
                     }
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -132,7 +169,6 @@ impl eframe::App for Sumu {
                 });
 
                 ui.add_space(8.0);
-
                 if ui
                     .add_enabled(self.actions.borrow().len() > 0, egui::Button::new("⮪"))
                     .clicked()
@@ -205,6 +241,8 @@ impl eframe::App for Sumu {
                         });
                     painter.extend(shapes);
                 }
+
+                self.handle_save(&ctx, canvas);
             });
         });
     }
