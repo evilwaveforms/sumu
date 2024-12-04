@@ -185,7 +185,7 @@ impl eframe::App for Sumu {
                 ui.add_space(8.0);
                 ui.selectable_value(&mut self.curr_action_type, ActionType::Erase, "⬜");
                 ui.selectable_value(&mut self.curr_action_type, ActionType::Paint, "✏");
-                egui::stroke_ui(ui, &mut self.curr_stroke, "Stroke");
+                ui.add(&mut self.curr_stroke);
 
                 ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
                     egui::widgets::global_dark_light_mode_buttons(ui)
@@ -207,7 +207,7 @@ impl eframe::App for Sumu {
                     egui::Image::new("file://".to_owned() + img_path).paint_at(ui, canvas.rect);
                 }
 
-                if ctx.input(|input| input.modifiers.matches(Modifiers::CTRL)) {
+                if ctx.input(|input| input.modifiers.matches_logically(Modifiers::CTRL)) {
                     if ctx.input(|input| input.key_pressed(Key::Z)) {
                         self.undo();
                     }
